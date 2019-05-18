@@ -22,12 +22,17 @@ function appendCheckbox(formElement, notebook) {
     return div;
 }
 
+window.addEventListener("unload", event => {
+	bgPage = chrome.extension.getBackgroundPage();
+	bgPage.unfixPopups();
+    });
+
 
 const notebookSelection = document.getElementById("notebookSelection");
 
 const fixedPromise = new Promise((resolve, reject) => {
 	try{
-	    chrome.runtime.sendMessage({"type": "fixPopup"}, response => {
+	    chrome.runtime.sendMessage({"type": "fixPopups"}, response => {
 		    if (!response) {
 			console.log("failed to fix popup");
 		    } else {
@@ -43,7 +48,7 @@ const ready = Promise.all([fixedPromise]);
 	
 ready.then(_ => fetch("https://www.lds.org/notes/api/v2/folders", {"credentials": "same-origin"}))
      .then(response => response.json())
-    .then(json => {json.forEach(notebook => appendCheckbox(notebookSelection, notebook));})
+     .then(json => {json.forEach(notebook => appendCheckbox(notebookSelection, notebook));})
      .catch(error => console.log(error));
 
 console.log("Created form");
