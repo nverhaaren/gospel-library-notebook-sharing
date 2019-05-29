@@ -36,9 +36,9 @@ function getSelected(formElement) {
   divs = Array.from(formElement.childNodes).filter(element => element.tagName === "DIV");
   console.debug(divs);
   notebookIds = divs
-    .map(element => element.firstElementChild)
-    .filter(element => element.checked)
-    .map(element => element.id.replace('notebook_', ''));
+  .map(element => element.firstElementChild)
+  .filter(element => element.checked)
+  .map(element => element.id.replace('notebook_', ''));
   return notebookIds;
 }
 
@@ -96,15 +96,15 @@ const notebookSelection = document.getElementById("notebookSelection");
 let notebooksJson = null;
 
 ready
-  .then(_ => fetch("https://www.lds.org/notes/api/v2/folders", {"credentials": "same-origin"}))
-  .then(response => response.json())
-  .then(json => {
-    notebooksJson = json;
-    json.forEach(notebook => appendCheckbox(notebookSelection, notebook));
-  })
-  .then(_ => notebookSelection.insertBefore(document.createElement('hr'), downloadButton))
-  .then(_ => downloadButton.removeAttribute('disabled'))
-  .catch(error => console.log(error));
+.then(_ => fetch("https://www.lds.org/notes/api/v2/folders", {"credentials": "same-origin"}))
+.then(response => response.json())
+.then(json => {
+  notebooksJson = json;
+  json.forEach(notebook => appendCheckbox(notebookSelection, notebook));
+})
+.then(_ => notebookSelection.insertBefore(document.createElement('hr'), downloadButton))
+.then(_ => downloadButton.removeAttribute('disabled'))
+.catch(error => console.log(error));
 
 console.log("Created form");
 
@@ -132,8 +132,8 @@ downloadButton.onclick = event => {
 
   // Look up annotations
   notebooksAnnotations = selectedIds
-    .map(notebookId => notebooksJsonById[notebookId])
-    .map(notebookJson => fetchNotebook(notebookJson));
+  .map(notebookId => notebooksJsonById[notebookId])
+  .map(notebookJson => fetchNotebook(notebookJson));
   notebooksAnnotations = Promise.all(notebooksAnnotations);
 
   // Aggregate
