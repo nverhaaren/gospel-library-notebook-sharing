@@ -10,33 +10,39 @@ function unfixPopups() {
   popupsFixed = false;
 }
 
-function updatePopup(changeInfo) {
-  const cookie = changeInfo.cookie;
-  console.debug("Processing cookie:");
-  if (cookie.name === "lds-id" && cookie.domain === ".lds.org") {
-    if (changeInfo.removed) {
-      console.log("logged out");
-      loggedIn = false;
-      if (!popupsFixed) {
-        console.log("set popup to login");
-        chrome.browserAction.setPopup({popup: "login_popup.html"});
-      }
-    } else {
-      console.log("logged in");
-      loggedIn = true;
-      if (!popupsFixed) {
-        console.log("set popup to main");
-        chrome.browserAction.setPopup({popup: "main_popup.html"});
-      }
+function updatePopup(newLoggedIn) {
+  if (newLoggedIn === loggedIn) {
+    return;
+  }
+  if (newLoggedIn) {
+    console.log("logged in");
+    loggedIn = true;
+    if (!popupsFixed) {
+      console.log("set popup to main");
+      chrome.browserAction.setPopup({popup: "main_popup.html"});
+    }
+  } else {
+    console.log("logged out");
+    loggedIn = false;
+    if (!popupsFixed) {
+      console.log("set popup to login");
+      chrome.browserAction.setPopup({popup: "login_popup.html"});
     }
   }
 }
 
-chrome.cookies.onChanged.addListener(updatePopup);
+chrome.cookies.onChanged.addListener(changeInfo => {
+  const cookie = changeInfo.cookie;
+  console.debug("Processing cookie:");
+  if (cookie.name === "lds-id" && cookie.domain === ".lds.org") {
+    updatePopup(!(changeInfo.removed))
+  }
+});
 console.debug("added cookie listener");
 
 chrome.cookies.get({url: 'https://www.lds.org', name: 'lds-id'}, cookie => {
-  if (cookie !== null) {
+  // todo, broken for debugging
+  if (/*cookie !== null*/ true) {
     console.log("Found lds-id cookie on startup");
     loggedIn = true;
     chrome.browserAction.setPopup({popup: "main_popup.html"});
@@ -55,11 +61,11 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   } else if (request.type === "unfixPopups") {
     console.log("unfixing popups");
     popupsFixed = false;
-    chrome.cookies.get({'url': 'https://www.lds.org', 'name': 'lds-id'}, cookie => {
+    chrome.cookies.get({url: 'https://www.lds.org', name: 'lds-id'}, cookie => {
       if (cookie === null) {
         console.log("We are now logged out");
         // loggedIn should already be true
-        console.log(loggedIn);
+        console.debug(loggedIn);
         chrome.browserAction.setPopup({popup: "login_popup.html"});
       }
     });
