@@ -75,7 +75,7 @@ window.addEventListener("unload", event => {
 
 const fixedPromise = new Promise((resolve, reject) => {
   try {
-    chrome.runtime.sendMessage({"type": "fixPopups"}, response => {
+    chrome.runtime.sendMessage({type: "fixPopups"}, response => {
       if (!response) {
         console.log("failed to fix popup");
       } else {
@@ -96,7 +96,7 @@ const notebookSelection = document.getElementById("notebookSelection");
 let notebooksJson = null;
 
 ready
-.then(_ => fetch("https://www.lds.org/notes/api/v2/folders", {"credentials": "same-origin"}))
+.then(_ => fetch("https://www.lds.org/notes/api/v2/folders", {credentials: "same-origin"}))
 .then(response => response.json())
 .then(json => {
   notebooksJson = json;
