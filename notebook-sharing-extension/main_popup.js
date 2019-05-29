@@ -21,7 +21,11 @@ function appendCheckbox(formElement, notebook) {
 
   label = document.createElement('label');
   label.setAttribute('for', checkboxId);
-  label.innerText = notebook.name;
+  labelText = notebook.name + ' (' + notebook.annotationCount.toString() + ')';
+  label.innerText = labelText;
+  lastUsed = new Date(notebook.lastUsed).toDateString();
+  label.setAttribute('title', 'Last updated: ' + lastUsed);
+
 
   div.appendChild(label);
 
@@ -65,9 +69,11 @@ async function fetchNotebook(notebookJson) {
 }
 
 // TODO: is this fixing thing actually helpful, and should how it works be changed?
+// note - even if the popup is changed that doesn't close the popup. So maybe not helpful.
+
+const bgPage = chrome.extension.getBackgroundPage();
 
 window.addEventListener("unload", event => {
-  bgPage = chrome.extension.getBackgroundPage();
   bgPage.unfixPopups();
 });
 
@@ -97,14 +103,19 @@ let notebooksJson = null;
 
 ready
 .then(_ => fetch("https://www.lds.org/notes/api/v2/folders", {credentials: "same-origin"}))
-.then(response => response.json())
+.then(response => {console.log('response:'); console.log(response); return response.json();})
 .then(json => {
   notebooksJson = json;
   json.forEach(notebook => appendCheckbox(notebookSelection, notebook));
 })
 .then(_ => notebookSelection.insertBefore(document.createElement('hr'), downloadButton))
 .then(_ => downloadButton.removeAttribute('disabled'))
-.catch(error => console.log(error));
+.catch(error => {
+  console.log(error);
+  bgPage.unfixPopups();
+  bgPage.updatePopup(false);
+  window.location.replace(chrome.runtime.getURL('login_popup.html'));
+});
 
 console.log("Created form");
 
