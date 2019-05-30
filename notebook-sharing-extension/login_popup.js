@@ -4,7 +4,7 @@ console.log("In login_popup.js");
 openLogin.onclick = function(element) {
   console.debug("About to open tab");
   chrome.tabs.create({
-    url: "https://ident.lds.org/sso/UI/Login",
+    url: "https://signin.lds.org/signinRedirect?goto=https%3a%2f%2fwww.lds.org%2f",
     active: true,
   });
 };

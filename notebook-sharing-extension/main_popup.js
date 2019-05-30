@@ -69,6 +69,7 @@ async function fetchNotebook(notebookJson) {
 }
 
 // TODO: is this fixing thing actually helpful, and should how it works be changed?
+// note - even if the popup is changed that doesn't close the popup. So maybe not helpful.
 
 const bgPage = chrome.extension.getBackgroundPage();
 

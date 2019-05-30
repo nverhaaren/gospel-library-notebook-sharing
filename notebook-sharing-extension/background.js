@@ -41,8 +41,7 @@ chrome.cookies.onChanged.addListener(changeInfo => {
 console.debug("added cookie listener");
 
 chrome.cookies.get({url: 'https://www.lds.org', name: 'lds-id'}, cookie => {
-  // todo, broken for debugging
-  if (/*cookie !== null*/ true) {
+  if (cookie !== null) {
     console.log("Found lds-id cookie on startup");
     loggedIn = true;
     chrome.browserAction.setPopup({popup: "main_popup.html"});
