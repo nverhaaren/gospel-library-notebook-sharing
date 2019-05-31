@@ -1,63 +1,97 @@
-console.log("In main_popup.js");
+console.log('In main_popup.js');
 
-// Functions for rendering list
+const downloadButton = $('#downloadButton');
+const notebookSelection = $('#notebookSelection');
+const selectAll = $('#selectAll');
 
-const downloadButton = document.getElementById("downloadButton");
+// Functions for inspecting UI
+function getNotebookCheckboxes() {
+  const checkboxes = notebookSelection.find('div>input:checkbox');
+  console.debug(checkboxes);
+  const notebooks = checkboxes
+  .filter((_, element) => element.id.slice(0, 'notebook_'.length) === 'notebook_');
+  console.debug(notebooks);
+  return notebooks;
+}
 
-function appendCheckbox(formElement, notebook) {
+function getSelectedNotebooks() {
+  notebookIds = getNotebookCheckboxes()
+  .filter(':checked')
+  .map((_, element) => element.id.replace('notebook_', ''));
+  return notebookIds.toArray();
+}
+
+function onCheckboxChange(event) {
+  console.debug(event);
+  const target = event.target;
+  console.debug('target:');
+  console.debug(target);
+  notebooks = getNotebookCheckboxes();
+  if (target.id === 'selectAll') {
+    console.debug('selectAll');
+    console.debug(target);
+    if (target.checked) {
+      notebooks.attr('checked', 'checked');
+    } else {
+      notebooks.removeAttr('checked');
+    }
+  } else {
+    if (notebooks.toArray().every(checkbox => checkbox.checked)) {
+      selectAll.attr('checked', 'checked');
+    } else if (notebooks.toArray().every(checkbox => !(checkbox.checked))) {
+      selectAll.removeAttr('checked');
+    }
+    console.log('notebooks');
+    console.log(notebooks);
+  }
+}
+
+selectAll.change(onCheckboxChange);
+
+// Function to help build dynamic UI elements
+
+function addCheckbox(notebook) {
   if (notebook.id === '') {
     return null;
   }
 
-  div = document.createElement('div');
+  div = $('<div>').insertBefore(downloadButton);
 
   checkboxId = 'notebook_' + notebook.id;
-  checkbox = document.createElement('input');
-  checkbox.setAttribute("type", 'checkbox');
-  checkbox.setAttribute('id', checkboxId);
-  checkbox.setAttribute('name', notebook.name);
+  checkbox = $('<input>', {
+    type: 'checkbox',
+    id: checkboxId,
+    name: notebook.name,
+  }).change(onCheckboxChange);
 
-  div.appendChild(checkbox);
+  div.append(checkbox);
 
-  label = document.createElement('label');
-  label.setAttribute('for', checkboxId);
-  labelText = notebook.name + ' (' + notebook.annotationCount.toString() + ')';
-  label.innerText = labelText;
   lastUsed = new Date(notebook.lastUsed).toDateString();
-  label.setAttribute('title', 'Last updated: ' + lastUsed);
+  label = $('<label>', {
+    for: checkboxId,
+    text: `${notebook.name} (${notebook.annotationCount})`,
+    title: `Last updated: ${lastUsed}`,
+  });
 
-
-  div.appendChild(label);
-
-  formElement.insertBefore(div, downloadButton);
+  div.append(label);
 
   return div;
 }
 
-// Functions for performing download
-
-function getSelected(formElement) {
-  divs = Array.from(formElement.childNodes).filter(element => element.tagName === "DIV");
-  console.debug(divs);
-  notebookIds = divs
-  .map(element => element.firstElementChild)
-  .filter(element => element.checked)
-  .map(element => element.id.replace('notebook_', ''));
-  return notebookIds;
-}
+// Function for performing download
 
 async function fetchNotebook(notebookJson) {
-  urlBase = "https://www.lds.org/notes/api/v2/annotations?";
+  urlBase = 'https://www.lds.org/notes/api/v2/annotations?';
   numberRemaining = notebookJson.annotationCount;
   numberReturned = 0;
   annotations = [];
   while (numberRemaining > 0) {
     numberToReturn = numberRemaining.toString();
-    url = urlBase + "folderId=" + notebookJson.id + "&";
-    url += "numberToReturn=" + numberToReturn + "&";
-    url += "start=" + (numberReturned + 1).toString() + "&";
-    url += "type=highlight%2Cjournal%2Creference";
-    result = await fetch(url, {credentials: "same-origin"}).then(response => response.json());
+    url = urlBase + `folderId=${notebookJson.id}&`;
+    url += `numberToReturn=${numberToReturn}&`;
+    url += `start=${numberReturned + 1}&`;
+    url += 'type=highlight%2Cjournal%2Creference';
+    result = await fetch(url, {credentials: 'same-origin'}).then(response => response.json());
     console.debug('fetchNotebook result:');
     console.debug(result);
     annotations = annotations.concat(result);
@@ -73,17 +107,17 @@ async function fetchNotebook(notebookJson) {
 
 const bgPage = chrome.extension.getBackgroundPage();
 
-window.addEventListener("unload", event => {
+window.onunload = event => {
   bgPage.unfixPopups();
-});
+};
 
 // Delay until popups fixed
 
 const fixedPromise = new Promise((resolve, reject) => {
   try {
-    chrome.runtime.sendMessage({type: "fixPopups"}, response => {
+    chrome.runtime.sendMessage({type: 'fixPopups'}, response => {
       if (!response) {
-        console.log("failed to fix popup");
+        console.log('failed to fix popup');
       } else {
         resolve(null);
       }
@@ -97,48 +131,61 @@ const ready = Promise.all([fixedPromise]);
 
 // Display list when ready
 
-const notebookSelection = document.getElementById("notebookSelection");
-
 let notebooksJson = null;
 
 ready
-.then(_ => fetch("https://www.lds.org/notes/api/v2/folders", {credentials: "same-origin"}))
-.then(response => {console.log('response:'); console.log(response); return response.json();})
+.then(_ => fetch('https://www.lds.org/notes/api/v2/folders', {credentials: 'same-origin'}))
+.then(response => {
+  // console.debug('response:'); console.debug(response);
+  return response.json();})
 .then(json => {
   notebooksJson = json;
-  json.forEach(notebook => appendCheckbox(notebookSelection, notebook));
+  json.forEach(notebook => addCheckbox(notebook));
+  if (json.length == 0) {
+    noNotebooks = $('<p>', {'class': 'note', text: 'You have not notebooks'});
+    downloadButton.before(noNotebooks);
+  }
+  return json.length
 })
-.then(_ => notebookSelection.insertBefore(document.createElement('hr'), downloadButton))
-.then(_ => downloadButton.removeAttribute('disabled'))
+.then(count => {
+  downloadButton.before($('<hr>'))
+  return count;
+})
+.then(count => {
+  if (count !== 0) {
+    downloadButton.removeAttr('disabled');
+  }
+})
 .catch(error => {
   console.log(error);
+  console.log()
   bgPage.unfixPopups();
   bgPage.updatePopup(false);
   window.location.replace(chrome.runtime.getURL('login_popup.html'));
 });
 
-console.log("Created form");
+console.log('Created form');
 
 // Set button behavior
 
-downloadButton.onclick = event => {
-  console.log("About to initiate download");
+downloadButton.click(event => {
+  console.log('About to initiate download');
 
   // find selected notebooks
   if (notebooksJson === null) {
     throw Error('download button was clicked with no notebook data loaded');
   }
   let notebooksJsonById = {};
-  console.debug("notebooksJsonById:");
+  console.debug('notebooksJsonById:');
   console.debug(notebooksJsonById);
   notebooksJson.forEach(notebookJson => {
     notebooksJsonById[notebookJson.id] = notebookJson
   });
-  selectedIds = getSelected(notebookSelection);
+  selectedIds = getSelectedNotebooks();
   console.debug(selectedIds);
   let selectedNotebooksJson = [];
   selectedIds.forEach(notebookId => {selectedNotebooksJson.push(notebooksJsonById[notebookId])});
-  console.debug("selectedNotebooksJson:");
+  console.debug('selectedNotebooksJson:');
   console.debug(selectedNotebooksJson);
 
   // Look up annotations
@@ -151,11 +198,11 @@ downloadButton.onclick = event => {
   retVal = notebooksAnnotations.then(notebooks => {
     let aggregateAnnotations = {};
     notebooks.forEach(annotations => {
-      console.debug("annotations:");
+      console.debug('annotations:');
       console.debug(annotations);
       annotations.forEach(annotation => {
         const annotationId = annotation.id;
-        console.debug("annotationId:");
+        console.debug('annotationId:');
         console.debug(annotationId);
         if (!(annotationId in aggregateAnnotations)) {
           aggregateAnnotations[annotationId] = annotation;
@@ -170,7 +217,7 @@ downloadButton.onclick = event => {
     const finalResult = {
       notebooks: selectedNotebooksJson,
       annotations: aggregateAnnotations,
-      version: '0.2'
+      version: '0.3.1',
     }
     console.log('finalResult:')
     console.log(finalResult);
@@ -181,4 +228,4 @@ downloadButton.onclick = event => {
     chrome.downloads.download({url: blobURL, filename: 'notebooks.json', saveAs: true});
     console.log('Download complete');
   })
-}
+});
