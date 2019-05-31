@@ -1,4 +1,4 @@
-let loggedIn = true;
+let loggedIn = false;
 let popupsFixed = false;
 
 function getLoggedIn() {
@@ -34,8 +34,10 @@ function updatePopup(newLoggedIn) {
 chrome.cookies.onChanged.addListener(changeInfo => {
   const cookie = changeInfo.cookie;
   console.debug("Processing cookie:");
+  // console.debug(cookie);
   if (cookie.name === "lds-id" && cookie.domain === ".lds.org") {
-    updatePopup(!(changeInfo.removed))
+    console.debug('Processing lds-id cookie');
+    updatePopup(!(changeInfo.removed));
   }
 });
 console.debug("added cookie listener");

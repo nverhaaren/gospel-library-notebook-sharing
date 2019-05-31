@@ -1,8 +1,42 @@
 console.log("In main_popup.js");
 
-// Functions for rendering list
-
 const downloadButton = document.getElementById("downloadButton");
+const notebookSelection = document.getElementById("notebookSelection");
+const selectAll = document.getElementById("selectAll");
+
+// Functions for inspecting UI
+function getNotebookCheckboxes() {
+  divs = Array.from(notebookSelection.childNodes).filter(element => element.tagName === "DIV");
+  console.debug(divs);
+  notebooks = divs
+  .map(element => element.firstElementChild)
+  .filter(element => element.tagName === 'INPUT' && element.type === 'checkbox')
+  .filter(element => element.id.slice(0, 'notebook_'.length) === 'notebook_');
+  return notebooks;
+}
+
+function getSelectedNotebooks() {
+  getNotebookCheckboxes()
+  .filter(element => element.checked)
+  .map(element => element.id.replace('notebook_', ''));
+  return notebookIds;
+}
+
+function onCheckboxChange(event) {
+  const target = event.target;
+  if (target.id === 'selectAll') {
+    console.log('selectAll');
+    console.log(target);
+  } else {
+    notebooks = getNotebookCheckboxes();
+    console.log('notebooks');
+    console.log(notebooks);
+  }
+}
+
+selectAll.onchange = onCheckboxChange;
+
+// Function to help build dynamic UI elements
 
 function appendCheckbox(formElement, notebook) {
   if (notebook.id === '') {
@@ -16,6 +50,7 @@ function appendCheckbox(formElement, notebook) {
   checkbox.setAttribute("type", 'checkbox');
   checkbox.setAttribute('id', checkboxId);
   checkbox.setAttribute('name', notebook.name);
+  checkbox.onchange = onCheckboxChange;
 
   div.appendChild(checkbox);
 
@@ -35,16 +70,6 @@ function appendCheckbox(formElement, notebook) {
 }
 
 // Functions for performing download
-
-function getSelected(formElement) {
-  divs = Array.from(formElement.childNodes).filter(element => element.tagName === "DIV");
-  console.debug(divs);
-  notebookIds = divs
-  .map(element => element.firstElementChild)
-  .filter(element => element.checked)
-  .map(element => element.id.replace('notebook_', ''));
-  return notebookIds;
-}
 
 async function fetchNotebook(notebookJson) {
   urlBase = "https://www.lds.org/notes/api/v2/annotations?";
@@ -97,8 +122,6 @@ const ready = Promise.all([fixedPromise]);
 
 // Display list when ready
 
-const notebookSelection = document.getElementById("notebookSelection");
-
 let notebooksJson = null;
 
 ready
@@ -107,9 +130,24 @@ ready
 .then(json => {
   notebooksJson = json;
   json.forEach(notebook => appendCheckbox(notebookSelection, notebook));
+  if (json.length == 0) {
+    noNotebooks = document.createElement('p');
+    noNotebooks.setAttribute('class', 'note');
+    noNotebooks.innerText = 'You have no notebooks';
+
+    notebookSelection.insertBefore(noNotebooks, downloadButton);
+  }
+  return json.length
 })
-.then(_ => notebookSelection.insertBefore(document.createElement('hr'), downloadButton))
-.then(_ => downloadButton.removeAttribute('disabled'))
+.then(count => {
+  notebookSelection.insertBefore(document.createElement('hr'), downloadButton);
+  return count;
+})
+.then(count => {
+  if (count !== 0) {
+    downloadButton.removeAttribute('disabled')
+  }
+})
 .catch(error => {
   console.log(error);
   bgPage.unfixPopups();
