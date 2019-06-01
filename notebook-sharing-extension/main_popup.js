@@ -217,7 +217,7 @@ downloadButton.click(event => {
     const finalResult = {
       notebooks: selectedNotebooksJson,
       annotations: aggregateAnnotations,
-      version: '0.3',
+      version: '0.3.1',
     }
     console.log('finalResult:')
     console.log(finalResult);
