@@ -32,14 +32,20 @@ function onCheckboxChange(event) {
     console.debug(target);
     if (target.checked) {
       notebooks.attr('checked', 'checked');
+      downloadButton.removeAttr('disabled');
     } else {
       notebooks.removeAttr('checked');
+      downloadButton.attr('disabled', 'disabled');
     }
   } else {
-    if (notebooks.toArray().every(checkbox => checkbox.checked)) {
-      selectAll.attr('checked', 'checked');
-    } else if (notebooks.toArray().every(checkbox => !(checkbox.checked))) {
+    if (notebooks.toArray().every(checkbox => !(checkbox.checked))) {
       selectAll.removeAttr('checked');
+      downloadButton.attr('disabled', 'disabled');
+    } else {
+      downloadButton.removeAttr('disabled');
+      if (notebooks.toArray().every(checkbox => checkbox.checked)) {
+        selectAll.attr('checked', 'checked');
+      }
     }
     console.log('notebooks');
     console.log(notebooks);
@@ -145,17 +151,8 @@ ready
     noNotebooks = $('<p>', {'class': 'note', text: 'You have not notebooks'});
     downloadButton.before(noNotebooks);
   }
-  return json.length
 })
-.then(count => {
-  downloadButton.before($('<hr>'))
-  return count;
-})
-.then(count => {
-  if (count !== 0) {
-    downloadButton.removeAttr('disabled');
-  }
-})
+.then(_ => downloadButton.before($('<hr>')))
 .catch(error => {
   console.log(error);
   console.log()
