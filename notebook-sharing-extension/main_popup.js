@@ -1,3 +1,5 @@
+const DOMAIN = 'churchofjesuschrist.org';
+const VERSION = '0.3.2';
 console.log('In main_popup.js');
 
 const downloadButton = $('#downloadButton');
@@ -87,7 +89,7 @@ function addCheckbox(notebook) {
 // Function for performing download
 
 async function fetchNotebook(notebookJson) {
-  urlBase = 'https://www.lds.org/notes/api/v2/annotations?';
+  urlBase = `https://www.${DOMAIN}/notes/api/v2/annotations?`;
   numberRemaining = notebookJson.annotationCount;
   numberReturned = 0;
   annotations = [];
@@ -140,10 +142,11 @@ const ready = Promise.all([fixedPromise]);
 let notebooksJson = null;
 
 ready
-.then(_ => fetch('https://www.lds.org/notes/api/v2/folders', {credentials: 'same-origin'}))
+.then(_ => fetch(`https://www.${DOMAIN}/notes/api/v2/folders`, {credentials: 'same-origin'}))
 .then(response => {
   // console.debug('response:'); console.debug(response);
-  return response.json();})
+  return response.json();
+})
 .then(json => {
   notebooksJson = json;
   json.forEach(notebook => addCheckbox(notebook));
@@ -214,7 +217,7 @@ downloadButton.click(event => {
     const finalResult = {
       notebooks: selectedNotebooksJson,
       annotations: aggregateAnnotations,
-      version: '0.3.1',
+      version: VERSION,
     }
     console.log('finalResult:')
     console.log(finalResult);

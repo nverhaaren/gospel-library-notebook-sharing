@@ -1,6 +1,6 @@
 {
   "name": "Gospel Library Notebook Sharing",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "manifest_version": 2,
   "background": {
     "scripts": ["background.js"],
@@ -9,6 +9,6 @@
   "browser_action": {
     "default_popup": "login_popup.html"
   },
-  "permissions": ["cookies", "downloads", "*://*.lds.org/"],
+  "permissions": ["cookies", "downloads", "*://*.churchofjesuschrist.org/"],
   "content_security_policy": "script-src 'self' https://edge.ldscdn.org; object-src 'self'"
 }
