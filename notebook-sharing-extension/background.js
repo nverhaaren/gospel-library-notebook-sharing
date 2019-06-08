@@ -1,4 +1,6 @@
 let loggedIn = false;
+const DOMAIN = 'churchofjesuschrist.org';
+const LOGIN_COOKIE_NAME = 'lds-id';
 
 function getLoggedIn() {
   return loggedIn;
@@ -25,14 +27,18 @@ chrome.cookies.onChanged.addListener(changeInfo => {
   const cookie = changeInfo.cookie;
   console.debug('Processing cookie:');
   // console.debug(cookie);
-  if (cookie.name === 'lds-id' && cookie.domain === '.lds.org') {
+  if (cookie.name === 'lds-id' && cookie.domain === `.${DOMAIN}`) {
     console.debug('Processing lds-id cookie');
     updatePopup(!(changeInfo.removed));
   }
 });
 console.debug('added cookie listener');
 
-chrome.cookies.get({url: 'https://www.lds.org', name: 'lds-id'}, cookie => {
+chrome.cookies.get({
+  url: `https://www.${DOMAIN}`,
+  name: LOGIN_COOKIE_NAME
+},
+cookie => {
   if (cookie !== null) {
     console.log('Found lds-id cookie on startup');
     updatePopup(true);
