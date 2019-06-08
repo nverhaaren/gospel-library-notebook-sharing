@@ -110,32 +110,10 @@ async function fetchNotebook(notebookJson) {
   return annotations;
 }
 
-// TODO: is this fixing thing actually helpful, and should how it works be changed?
-// note - even if the popup is changed that doesn't close the popup. So maybe not helpful.
-
 const bgPage = chrome.extension.getBackgroundPage();
 
-window.onunload = event => {
-  bgPage.unfixPopups();
-};
-
-// Delay until popups fixed
-
-const fixedPromise = new Promise((resolve, reject) => {
-  try {
-    chrome.runtime.sendMessage({type: 'fixPopups'}, response => {
-      if (!response) {
-        console.log('failed to fix popup');
-      } else {
-        resolve(null);
-      }
-    });
-  } catch(error) {
-    reject(error)
-  }
-});
-
-const ready = Promise.all([fixedPromise]);
+// ready is trivial for now
+const ready = Promise.resolve();
 
 // Display list when ready
 
@@ -158,8 +136,6 @@ ready
 .then(_ => downloadButton.before($('<hr>')))
 .catch(error => {
   console.log(error);
-  console.log()
-  bgPage.unfixPopups();
   bgPage.updatePopup(false);
   window.location.replace(chrome.runtime.getURL('login_popup.html'));
 });
