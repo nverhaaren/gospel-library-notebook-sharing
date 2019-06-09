@@ -3,12 +3,12 @@ const VERSION = '0.3.2';
 console.log('In main_popup.js');
 
 const downloadButton = $('#downloadButton');
-const notebookSelection = $('#notebookSelection');
+const annotationSelection = $('#annotationSelection');
 const selectAll = $('#selectAll');
 
 // Functions for inspecting UI
 function getNotebookCheckboxes() {
-  const checkboxes = notebookSelection.find('div>input:checkbox');
+  const checkboxes = annotationSelection.find('div>input:checkbox');
   console.debug(checkboxes);
   const notebooks = checkboxes
   .filter((_, element) => element.id.slice(0, 'notebook_'.length) === 'notebook_');
@@ -37,12 +37,24 @@ function onCheckboxChange(event) {
       downloadButton.removeAttr('disabled');
     } else {
       notebooks.removeAttr('checked');
+      if ($('#unassignedAnnotations:checked').length === 0) {
+        downloadButton.attr('disabled', 'disabled');
+      }
+    }
+  } else if (target.id === 'unassignedAnnotations') {
+    console.debug('unassignedAnnotations');
+    console.debug(target);
+    if (target.checked) {
+      downloadButton.removeAttr('disabled');
+    } else if (notebooks.toArray().every(checkbox => !(checkbox.checked))) {
       downloadButton.attr('disabled', 'disabled');
     }
   } else {
     if (notebooks.toArray().every(checkbox => !(checkbox.checked))) {
       selectAll.removeAttr('checked');
-      downloadButton.attr('disabled', 'disabled');
+      if ($('#unassignedAnnotations:checked').length === 0) {
+        downloadButton.attr('disabled', 'disabled');
+      }
     } else {
       downloadButton.removeAttr('disabled');
       if (notebooks.toArray().every(checkbox => checkbox.checked)) {
@@ -63,7 +75,7 @@ function addCheckbox(notebook) {
     return null;
   }
 
-  div = $('<div>').insertBefore(downloadButton);
+  div = $('<div>').insertBefore(downloadButton).addClass('selectionLine');
 
   checkboxId = 'notebook_' + notebook.id;
   checkbox = $('<input>', {
@@ -88,14 +100,24 @@ function addCheckbox(notebook) {
 
 // Function for performing download
 
+let notesUpperBound = 0;
+
 async function fetchNotebook(notebookJson) {
   urlBase = `https://www.${DOMAIN}/notes/api/v2/annotations?`;
-  numberRemaining = notebookJson.annotationCount;
+  let numberRemaining = null;
+  if (notebookJson !== null) {
+    numberRemaining = notebookJson.annotationCount;
+  } else {
+    numberRemaining = notesUpperBound;
+  }
   numberReturned = 0;
   annotations = [];
   while (numberRemaining > 0) {
-    numberToReturn = numberRemaining.toString();
-    url = urlBase + `folderId=${notebookJson.id}&`;
+    numberToReturn = numberRemaining;
+    url = urlBase;
+    if (notebookJson !== null) {
+      url += `folderId=${notebookJson.id}&`;
+    }
     url += `numberToReturn=${numberToReturn}&`;
     url += `start=${numberReturned + 1}&`;
     url += 'type=highlight%2Cjournal%2Creference';
@@ -126,29 +148,70 @@ ready
   return response.json();
 })
 .then(json => {
+  if (json.length === 0) {
+    const noNotebooks = $('<p>', {text: 'You have no notebooks'})
+    .addClass('note');
+    downloadButton.before(noNotebooks);
+    return null;
+  }
+
   notebooksJson = json;
   let unassigned = null;
-  let notesUpperBound = 0;
+  let trueNotebookCount = 0;
   json.forEach(notebook => {
     if (notebook.id === '') {
       unassigned = notebook.annotationCount;
+    } else {
+      trueNotebookCount++;
     }
     notesUpperBound += notebook.annotationCount;
     addCheckbox(notebook);
   });
+  if (trueNotebookCount === 0) {
+    const noNotebooks = $('<p>', {text: 'You have no notebooks'})
+    .addClass('note');
+    downloadButton.before(noNotebooks);
+  }
+
   if (unassigned === null) {
     console.warn('No "Unassigned Items" notebook');
     unassigned = 0;
   }
-  if (json.length == 0) {
-    noNotebooks = $('<p>', {'class': 'note', text: 'You have no notebooks'});
-    downloadButton.before(noNotebooks);
+  return unassigned;
+})
+.then(unassigned => {
+  downloadButton.before($('<hr>'));
+  return unassigned;
+})
+.then(unassigned => {
+  if (unassigned === null || unassigned === 0) {
+    noUnassigned = $('<p>', {text: 'You have no unassigned annotations'})
+    .addClass('note');
+    downloadButton.before(noUnassigned);
+    return null;
   }
-  // TODO - add unassigned checkbox
+
+  div = $('<div>').insertBefore(downloadButton).addClass('selectionLine');
+
+  checkbox = $('<input>', {
+    type: 'checkbox',
+    id: 'unassignedAnnotations',
+    name: 'unassignedAnnotations',
+  }).change(onCheckboxChange);
+
+  div.append(checkbox);
+
+  label = $('<label>', {
+    for: 'unassignedAnnotations',
+    text: `Include all annotations (${unassigned} not assigned to any notebook)`,
+  });
+
+  div.append(label);
 })
 .then(_ => downloadButton.before($('<hr>')))
+.then(_ => annotationSelection.removeAttr('hidden'))
 .catch(error => {
-  console.log(error);
+  // console.log(error);
   bgPage.updatePopup(false);
   window.location.replace(chrome.runtime.getURL('login_popup.html'));
 });
@@ -177,32 +240,39 @@ downloadButton.click(event => {
   console.debug('selectedNotebooksJson:');
   console.debug(selectedNotebooksJson);
 
+  let notebooksAnnotations = null;
   // Look up annotations
-  notebooksAnnotations = selectedIds
-  .map(notebookId => notebooksJsonById[notebookId])
-  .map(notebookJson => fetchNotebook(notebookJson));
-  notebooksAnnotations = Promise.all(notebooksAnnotations);
+  if ($('#unassignedAnnotations:checked').length > 0) {
+    fetchAnnotations = fetchNotebook(null);
+  } else {
+    notebooksAnnotations = selectedIds
+    .map(notebookId => notebooksJsonById[notebookId])
+    .map(notebookJson => fetchNotebook(notebookJson));
+    notebooksAnnotations = Promise.all(notebooksAnnotations);
 
-  // Aggregate
-  retVal = notebooksAnnotations.then(notebooks => {
-    let aggregateAnnotations = {};
-    notebooks.forEach(annotations => {
-      console.debug('annotations:');
-      console.debug(annotations);
-      annotations.forEach(annotation => {
-        const annotationId = annotation.id;
-        console.debug('annotationId:');
-        console.debug(annotationId);
-        if (!(annotationId in aggregateAnnotations)) {
-          aggregateAnnotations[annotationId] = annotation;
-        }
-      });
-      console.debug('aggregateAnnotations:');
-      console.debug(aggregateAnnotations);
+    fetchAnnotations = notebooksAnnotations.then(notebooks => {
+      let aggregateAnnotations = {};
+      notebooks.forEach(annotations => {
+        console.debug('annotations:');
+        console.debug(annotations);
+        annotations.forEach(annotation => {
+          const annotationId = annotation.id;
+          console.debug('annotationId:');
+          console.debug(annotationId);
+          if (!(annotationId in aggregateAnnotations)) {
+            aggregateAnnotations[annotationId] = annotation;
+          }
+        });
+        console.debug('aggregateAnnotations:');
+        console.debug(aggregateAnnotations);
+        return aggregateAnnotations;
+      })
       return aggregateAnnotations;
     })
-    return aggregateAnnotations;
-  }).then(aggregateAnnotations => {
+  }
+
+  // Aggregate
+  fetchAnnotations.then(aggregateAnnotations => {
     const finalResult = {
       notebooks: selectedNotebooksJson,
       annotations: aggregateAnnotations,
