@@ -127,11 +127,24 @@ ready
 })
 .then(json => {
   notebooksJson = json;
-  json.forEach(notebook => addCheckbox(notebook));
+  let unassigned = null;
+  let notesUpperBound = 0;
+  json.forEach(notebook => {
+    if (notebook.id === '') {
+      unassigned = notebook.annotationCount;
+    }
+    notesUpperBound += notebook.annotationCount;
+    addCheckbox(notebook);
+  });
+  if (unassigned === null) {
+    console.warn('No "Unassigned Items" notebook');
+    unassigned = 0;
+  }
   if (json.length == 0) {
-    noNotebooks = $('<p>', {'class': 'note', text: 'You have not notebooks'});
+    noNotebooks = $('<p>', {'class': 'note', text: 'You have no notebooks'});
     downloadButton.before(noNotebooks);
   }
+  // TODO - add unassigned checkbox
 })
 .then(_ => downloadButton.before($('<hr>')))
 .catch(error => {
