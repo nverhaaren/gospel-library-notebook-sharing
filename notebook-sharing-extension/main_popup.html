@@ -3,15 +3,15 @@
 <head>
   <style>
   h1 { text-align: center; white-space: nowrap; }
-  #selectionContainer div { white-space: nowrap; }
+  .selectionLine { white-space: nowrap; display: flex; align-items: center;}
   </style>
 </head>
 <body>
   <h1 id="title">Select Notebooks to Export</h1>
   <hr>
   <div id="selectionContainer">
-    <form id="notebookSelection">
-      <div>
+    <form id="annotationSelection" hidden>
+      <div class="selectionLine">
         <input type="checkbox" id="selectAll" name="selectAll">
         <label for="selectAll">Select all notebooks</label>
       </div>
