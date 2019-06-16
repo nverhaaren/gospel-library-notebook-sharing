@@ -71,6 +71,7 @@ selectAll.change(onCheckboxChange);
 // Function to help build dynamic UI elements
 
 function addCheckbox(notebook) {
+  // console.debug(notebook);
   if (notebook.id === '') {
     return null;
   }
@@ -86,10 +87,19 @@ function addCheckbox(notebook) {
 
   div.append(checkbox);
 
+  const annotationCount = 'order' in notebook ? notebook.order.id.length : 0;
+  if (annotationCount !== notebook.annotationCount) {
+    console.debug(
+      `Number of annotations ${annotationCount} does not match ` +
+      `annotationCount ${notebook.annotationCount} ` +
+      `for notebook ${notebook.id}`
+    );
+  }
+
   lastUsed = new Date(notebook.lastUsed).toDateString();
   label = $('<label>', {
     for: checkboxId,
-    text: `${notebook.name} (${notebook.annotationCount})`,
+    text: `${notebook.name} (${annotationCount})`,
     title: `Last updated: ${lastUsed}`,
   });
 
@@ -212,6 +222,7 @@ ready
 .then(_ => annotationSelection.removeAttr('hidden'))
 .catch(error => {
   // console.log(error);
+  // console.log('About to redirect to login');
   bgPage.updatePopup(false);
   window.location.replace(chrome.runtime.getURL('login_popup.html'));
 });

@@ -27,8 +27,8 @@ chrome.cookies.onChanged.addListener(changeInfo => {
   const cookie = changeInfo.cookie;
   console.debug('Processing cookie:');
   // console.debug(cookie);
-  if (cookie.name === 'lds-id' && cookie.domain === `.${DOMAIN}`) {
-    console.debug('Processing lds-id cookie');
+  if (cookie.name === LOGIN_COOKIE_NAME && cookie.domain === `.${DOMAIN}`) {
+    console.debug(`Processing ${LOGIN_COOKIE_NAME} cookie`);
     updatePopup(!(changeInfo.removed));
   }
 });
@@ -40,7 +40,7 @@ chrome.cookies.get({
 },
 cookie => {
   if (cookie !== null) {
-    console.log('Found lds-id cookie on startup');
+    console.log(`Found ${LOGIN_COOKIE_NAME} cookie on startup`);
     updatePopup(true);
     console.log('set popup to main');
   }
