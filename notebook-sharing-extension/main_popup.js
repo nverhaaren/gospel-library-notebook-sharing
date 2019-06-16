@@ -254,7 +254,13 @@ downloadButton.click(event => {
   let notebooksAnnotations = null;
   // Look up annotations
   if ($('#unassignedAnnotations:checked').length > 0) {
-    fetchAnnotations = fetchNotebook(null);
+    fetchAnnotations = fetchNotebook(null).then(allAnnotations => {
+      let aggregateAnnotations = {};
+      allAnnotations.forEach(annotation => {
+        aggregateAnnotations[annotation.id] = annotation;
+      });
+      return aggregateAnnotations;
+    });
   } else {
     notebooksAnnotations = selectedIds
     .map(notebookId => notebooksJsonById[notebookId])
@@ -264,18 +270,18 @@ downloadButton.click(event => {
     fetchAnnotations = notebooksAnnotations.then(notebooks => {
       let aggregateAnnotations = {};
       notebooks.forEach(annotations => {
-        console.debug('annotations:');
-        console.debug(annotations);
+        // console.debug('annotations:');
+        // console.debug(annotations);
         annotations.forEach(annotation => {
           const annotationId = annotation.id;
-          console.debug('annotationId:');
-          console.debug(annotationId);
+          // console.debug('annotationId:');
+          // console.debug(annotationId);
           if (!(annotationId in aggregateAnnotations)) {
             aggregateAnnotations[annotationId] = annotation;
           }
         });
-        console.debug('aggregateAnnotations:');
-        console.debug(aggregateAnnotations);
+        // console.debug('aggregateAnnotations:');
+        // console.debug(aggregateAnnotations);
         return aggregateAnnotations;
       })
       return aggregateAnnotations;
