@@ -1,5 +1,5 @@
 const DOMAIN = 'churchofjesuschrist.org';
-const VERSION = '0.3.2';
+const VERSION = '0.4';
 console.log('In main_popup.js');
 
 const downloadButton = $('#downloadButton');
