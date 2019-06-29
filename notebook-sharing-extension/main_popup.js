@@ -4,14 +4,15 @@ console.log('In main_popup.js');
 
 class NotebookManager {
   // TODO: use private fields when there is broader compatability
-  _downloadButton: $('#downloadButton');
-  _annotationSelection: $('#annotationSelection');
-  _selectAll: $('#selectAll');
+  _downloadButton = $('#downloadButton');
+  _annotationSelection = $('#annotationSelection');
+  _selectAll = $('#selectAll');
 
   constructor() {
     this._notebooks = {};
     this._notebookAnnotationCount = {};
     this._unassignedNotebook = null;
+    this._totalAnnotationEstimate = 0;
   }
 
   get downloadButton() {
@@ -38,6 +39,10 @@ class NotebookManager {
     return this._unassignedNotebook;
   }
 
+  get totalAnnotationEstimate() {
+    return this._totalAnnotationEstimate;
+  }
+
   // jQuery selection of elements
   get notebookCheckboxes() {
     const checkboxes = this.annotationSelection.find('div>input:checkbox');
@@ -60,6 +65,15 @@ class NotebookManager {
       .filter(':checked')
       .map((_, element) => element.id.replace('notebook_', ''));
     return notebookIds.toArray();
+  }
+
+  get selectedNotebooks() {
+    let ret = {};
+    const notebooks = this.notebooks;
+    this.selectedNotebookIds.forEach(notebookid => {
+      ret[notebookId] = notebooks[notebookId];
+    });
+    return ret;
   }
 
   get nonemptySelection() {
@@ -99,8 +113,6 @@ class NotebookManager {
     }
   }
 
-  _onUnassignedCheckboxChange(event) {}
-
   addCheckbox(notebook) {
     // console.debug(notebook);
     if (notebook.id === '') {
@@ -108,6 +120,7 @@ class NotebookManager {
         throw Error('found multiple unassigned notebooks');
       }
       this._unassignedNotebook = notebook;
+      this._totalAnnotationEstimate += notebook.annotationCount;
       return null;
     }
 
@@ -128,6 +141,7 @@ class NotebookManager {
 
     const annotationCount = 'order' in notebook ? notebook.order.id.length : 0;
     this._notebookAnnotationCount[notebook.id] = annotationCount;
+    this._totalAnnotationEstimate += notebook.annotationCount;
     if (annotationCount !== notebook.annotationCount) {
       console.debug(
         `Number of annotations ${annotationCount} does not match ` +
@@ -154,9 +168,6 @@ const notebookManager = new NotebookManager();
 notebookManager.selectAll.change(
   notebookManager._changeWrapper(notebookManager._onSelectAllChange)
 );
-notebookManager.unassignedAnnotations.change(
-  notebookManager._changeWrapper(notebookManager._onUnassignedCheckboxChange)
-);
 
 function updateDownloadButton() {
   if (notebookManager.nonemptySelection ||
@@ -167,36 +178,48 @@ function updateDownloadButton() {
   }
 }
 
-
-// Function for performing download
-
-// TODO: replace notesUpperBound from manager
-let notesUpperBound = 0;
+// Functions for performing download
+// I don't think this one needs to be async (it already returns a promise) but
+// it shouldn't hurt either
+async function fetchAnnotations(notebookId, start, numberToReturn) {
+  urlBase = `https://www.${DOMAIN}/notes/api/v2/annotations?`;
+  url = urlBase;
+  if (notebookId !== null) {
+    url += `folderId=${notebookId}&`;
+  }
+  url += `numberToReturn=${numberToReturn}&`;
+  url += `start=${numberReturned + 1}&`;
+  url += 'type=highlight%2Cjournal%2Creference';
+  result = fetch(url, {credentials: 'same-origin'}).then(response => response.json());
+  console.debug('fetchAnnotations result:');
+  console.debug(result);
+  return result;
+}
 
 async function fetchNotebook(notebookId) {
-  urlBase = `https://www.${DOMAIN}/notes/api/v2/annotations?`;
   let numberRemaining = null;
-  if (notebookJson !== null) {
+  if (notebookId !== null) {
     numberRemaining = notebookManager._notebookAnnotationCount[notebookId];
   } else {
-    numberRemaining = notesUpperBound;
+    numberRemaining = notebookManager.totalAnnotationEstimate;
   }
   numberReturned = 0;
   annotations = [];
-  while (numberRemaining > 0) {
-    numberToReturn = numberRemaining;
-    url = urlBase;
-    if (notebookJson !== null) {
-      url += `folderId=${notebookJson.id}&`;
-    }
-    url += `numberToReturn=${numberToReturn}&`;
-    url += `start=${numberReturned + 1}&`;
-    url += 'type=highlight%2Cjournal%2Creference';
-    result = await fetch(url, {credentials: 'same-origin'}).then(response => response.json());
-    console.debug('fetchNotebook result:');
-    console.debug(result);
+  while (true) {
+    numberToReturn = numberRemaining >= 0 ? numberRemaining : 50;
+    result = await fetchAnnotations(notebookId, numberReturned + 1, numberToReturn);
     annotations = annotations.concat(result);
     numberRemaining -= result.length;
+    numberReturned += result.length;
+    if (result.length === 0 || numberRemaining <= 0) {
+      trialResult = await fetchAnnotations(notebookId, numberReturned + 1, 1);
+      if (trialResult.length === 0) {
+        break;
+      }
+      annotations = annotations.concat(trialResult);
+      numberRemaining -= trialResult.length;
+      numberReturned += trialResult.length;
+    }
   }
   console.debug('fetchNotebook annotations:');
   console.debug(annotations);
@@ -209,9 +232,6 @@ const bgPage = chrome.extension.getBackgroundPage();
 const ready = Promise.resolve();
 
 // Display list when ready
-
-let notebooksJson = null;
-
 ready
 .then(_ => fetch(`https://www.${DOMAIN}/notes/api/v2/folders`, {credentials: 'same-origin'}))
 .then(response => {
@@ -222,65 +242,54 @@ ready
   if (json.length === 0) {
     const noNotebooks = $('<p>', {text: 'You have no notebooks'})
     .addClass('note');
-    downloadButton.before(noNotebooks);
+    notebookManager.downloadButton.before(noNotebooks);
     return null;
   }
 
-  notebooksJson = json;
-  let unassigned = null;
-  let trueNotebookCount = 0;
   json.forEach(notebook => {
-    if (notebook.id === '') {
-      unassigned = notebook.annotationCount;
-    } else {
-      trueNotebookCount++;
-    }
-    notesUpperBound += notebook.annotationCount;
-    addCheckbox(notebook);
+    notebookManager.addCheckbox(notebook);
   });
-  if (trueNotebookCount === 0) {
+  if (notebookManager.notebookCheckboxes.length === 0) {
     const noNotebooks = $('<p>', {text: 'You have no notebooks'})
     .addClass('note');
-    downloadButton.before(noNotebooks);
+    notebookManager.downloadButton.before(noNotebooks);
   }
 
-  if (unassigned === null) {
+  if (notebookManager.unassignedNotebook === null) {
     console.warn('No "Unassigned Items" notebook');
-    unassigned = 0;
   }
-  return unassigned;
 })
-.then(unassigned => {
-  downloadButton.before($('<hr>'));
-  return unassigned;
-})
-.then(unassigned => {
-  if (unassigned === null || unassigned === 0) {
+.then(_ => notebookManager.downloadButton.before($('<hr>')))
+.then(_ => {
+  unassignedNotebook = notebookManager.unassignedNotebook;
+  if (unassignedNotebook === null || unassignedNotebook.length === 0) {
     noUnassigned = $('<p>', {text: 'You have no unassigned annotations'})
     .addClass('note');
-    downloadButton.before(noUnassigned);
+    notebookManager.downloadButton.before(noUnassigned);
     return null;
   }
 
-  div = $('<div>').insertBefore(downloadButton).addClass('selectionLine');
+  div = $('<div>').insertBefore(notebookManager.downloadButton).addClass('selectionLine');
 
-  checkbox = $('<input>', {
+  unassignedCheckbox = $('<input>', {
     type: 'checkbox',
     id: 'unassignedAnnotations',
     name: 'unassignedAnnotations',
-  }).change(onCheckboxChange);
+  }).change(updateDownloadButton);
 
-  div.append(checkbox);
+  div.append(unassignedCheckbox);
+
+  const unassignedEstimate = unassignedNotebook !== null ? unassignedNotebook.length : 0;
 
   label = $('<label>', {
     for: 'unassignedAnnotations',
-    text: `Include all annotations (${unassigned} not assigned to any notebook)`,
+    text: `Include all annotations (about ${unassignedEstimate} not assigned to any notebook)`,
   });
 
   div.append(label);
 })
-.then(_ => downloadButton.before($('<hr>')))
-.then(_ => annotationSelection.removeAttr('hidden'))
+.then(_ => notebookManager.downloadButton.before($('<hr>')))
+.then(_ => notebookManager.annotationSelection.removeAttr('hidden'))
 .catch(error => {
   // console.log(error);
   // console.log('About to redirect to login');
@@ -292,30 +301,20 @@ console.log('Created form');
 
 // Set button behavior
 
-downloadButton.click(event => {
+notebookManager.downloadButton.click(event => {
   console.log('About to initiate download');
 
   // find selected notebooks
-  if (notebooksJson === null) {
+  if (notebookManager.notebooks === {}) {
     throw Error('download button was clicked with no notebook data loaded');
   }
-  let notebooksJsonById = {};
-  console.debug('notebooksJsonById:');
-  console.debug(notebooksJsonById);
-  notebooksJson.forEach(notebookJson => {
-    notebooksJsonById[notebookJson.id] = notebookJson
-  });
-  selectedIds = getSelectedNotebooks();
-  console.debug(selectedIds);
-  let selectedNotebooksJson = [];
-  selectedIds.forEach(notebookId => {selectedNotebooksJson.push(notebooksJsonById[notebookId])});
-  console.debug('selectedNotebooksJson:');
-  console.debug(selectedNotebooksJson);
+  console.debug('notebookManager.selectedNotebookIds');
+  console.debug(notebookManager.selectedNotebookIds);
 
   let notebooksAnnotations = null;
   // Look up annotations
   if ($('#unassignedAnnotations:checked').length > 0) {
-    fetchAnnotations = fetchNotebook(null).then(allAnnotations => {
+    fetchSelectedAnnotations = fetchNotebook(null).then(allAnnotations => {
       let aggregateAnnotations = {};
       allAnnotations.forEach(annotation => {
         aggregateAnnotations[annotation.id] = annotation;
@@ -323,14 +322,13 @@ downloadButton.click(event => {
       return aggregateAnnotations;
     });
   } else {
-    notebooksAnnotations = selectedIds
-    .map(notebookId => notebooksJsonById[notebookId])
-    .map(notebookJson => fetchNotebook(notebookJson));
+    notebooksAnnotations = notebookManager.selectedNotebookIds
+    .map(notebookId => fetchNotebook(notebookId));
     notebooksAnnotations = Promise.all(notebooksAnnotations);
 
-    fetchAnnotations = notebooksAnnotations.then(notebooks => {
+    fetchSelectedAnnotations = notebooksAnnotations.then(notebookAnnotations => {
       let aggregateAnnotations = {};
-      notebooks.forEach(annotations => {
+      notebookAnnotations.forEach(annotations => {
         // console.debug('annotations:');
         // console.debug(annotations);
         annotations.forEach(annotation => {
@@ -350,13 +348,13 @@ downloadButton.click(event => {
   }
 
   // Aggregate
-  fetchAnnotations.then(aggregateAnnotations => {
+  fetchSelectedAnnotations.then(aggregateAnnotations => {
     const finalResult = {
-      notebooks: selectedNotebooksJson,
+      notebooks: notebookManager.selectedNotebooks,
       annotations: aggregateAnnotations,
       version: VERSION,
     }
-    console.log('finalResult:')
+    console.log('finalResult:');
     console.log(finalResult);
     return finalResult;
   }).then(finalResult => {
