@@ -2,121 +2,182 @@ const DOMAIN = 'churchofjesuschrist.org';
 const VERSION = '0.4';
 console.log('In main_popup.js');
 
-const downloadButton = $('#downloadButton');
-const annotationSelection = $('#annotationSelection');
-const selectAll = $('#selectAll');
+class NotebookManager {
+  // TODO: use private fields when there is broader compatability
+  _downloadButton: $('#downloadButton');
+  _annotationSelection: $('#annotationSelection');
+  _selectAll: $('#selectAll');
 
-// Functions for inspecting UI
-function getNotebookCheckboxes() {
-  const checkboxes = annotationSelection.find('div>input:checkbox');
-  console.debug(checkboxes);
-  const notebooks = checkboxes
-  .filter((_, element) => element.id.slice(0, 'notebook_'.length) === 'notebook_');
-  console.debug(notebooks);
-  return notebooks;
-}
+  constructor() {
+    this._notebooks = {};
+    this._notebookAnnotationCount = {};
+    this._unassignedNotebook = null;
+  }
 
-function getSelectedNotebooks() {
-  notebookIds = getNotebookCheckboxes()
-  .filter(':checked')
-  .map((_, element) => element.id.replace('notebook_', ''));
-  return notebookIds.toArray();
-}
+  get downloadButton() {
+    return this._downloadButton;
+  }
 
-function onCheckboxChange(event) {
-  console.debug(event);
-  const target = event.target;
-  console.debug('target:');
-  console.debug(target);
-  notebooks = getNotebookCheckboxes();
-  if (target.id === 'selectAll') {
-    console.debug('selectAll');
-    console.debug(target);
-    if (target.checked) {
-      notebooks.attr('checked', 'checked');
-      downloadButton.removeAttr('disabled');
-    } else {
-      notebooks.removeAttr('checked');
-      if ($('#unassignedAnnotations:checked').length === 0) {
-        downloadButton.attr('disabled', 'disabled');
-      }
+  get annotationSelection() {
+    return this._annotationSelection;
+  }
+
+  get selectAll() {
+    return this._selectAll;
+  }
+
+  get notebooks() {
+    return this._notebooks;
+  }
+
+  get notebookAnnotationCount() {
+    return this._notebookAnnotationCount;
+  }
+
+  get unassignedNotebook() {
+    return this._unassignedNotebook;
+  }
+
+  // jQuery selection of elements
+  get notebookCheckboxes() {
+    const checkboxes = this.annotationSelection.find('div>input:checkbox');
+    console.debug(checkboxes);
+    const notebooks = checkboxes
+      .filter((_, element) =>
+              element.id.slice(0, 'notebook_'.length) === 'notebook_');
+    console.debug(notebooks);
+    return notebooks;
+  }
+
+  // array of bool
+  get selectedVector() {
+    return this.notebookCheckboxes.toArray().map(checkbox => checkbox.checked);
+  }
+
+  // Array of strings
+  get selectedNotebookIds() {
+    notebookIds = this.notebookCheckboxes
+      .filter(':checked')
+      .map((_, element) => element.id.replace('notebook_', ''));
+    return notebookIds.toArray();
+  }
+
+  get nonemptySelection() {
+    return this.selectedNotebookIds.length !== 0;
+  }
+
+  _changeWrapper(onChangeFn) {
+    return event => {
+      console.debug(event);
+      const target = event.target;
+      console.debug('target:');
+      console.debug(target);
+
+      onChangeFn(event);
+      updateDownloadButton();
+    };
+  }
+
+  _onNotebookCheckboxChange(event) {
+    console.debug('selectedVector:');
+    console.debug(selectedVector);
+    if (this.selectedVector.every(x => x)) {
+      selectAll.attr('checked', 'checked');
+      return;
     }
-  } else if (target.id === 'unassignedAnnotations') {
-    console.debug('unassignedAnnotations');
-    console.debug(target);
-    if (target.checked) {
-      downloadButton.removeAttr('disabled');
-    } else if (notebooks.toArray().every(checkbox => !(checkbox.checked))) {
-      downloadButton.attr('disabled', 'disabled');
-    }
-  } else {
-    if (notebooks.toArray().every(checkbox => !(checkbox.checked))) {
+    if (this.selectedVector.every(x => !x)) {
       selectAll.removeAttr('checked');
-      if ($('#unassignedAnnotations:checked').length === 0) {
-        downloadButton.attr('disabled', 'disabled');
-      }
-    } else {
-      downloadButton.removeAttr('disabled');
-      if (notebooks.toArray().every(checkbox => checkbox.checked)) {
-        selectAll.attr('checked', 'checked');
-      }
     }
-    console.log('notebooks');
-    console.log(notebooks);
+  }
+
+  _onSelectAllChange(event) {
+    target = event.target;
+    if (target.checked) {
+      this.notebookCheckboxes.attr('checked', 'checked');
+    } else {
+      this.notebookCheckboxes.removeAttr('checked');
+    }
+  }
+
+  _onUnassignedCheckboxChange(event) {}
+
+  addCheckbox(notebook) {
+    // console.debug(notebook);
+    if (notebook.id === '') {
+      if (this.unassignedNotebook !== null) {
+        throw Error('found multiple unassigned notebooks');
+      }
+      this._unassignedNotebook = notebook;
+      return null;
+    }
+
+    this._notebooks[notebook.id] = notebook;
+
+    div = $('<div>')
+      .insertBefore(this.downloadButton)
+      .addClass('selectionLine');
+
+    checkboxId = 'notebook_' + notebook.id;
+    checkbox = $('<input>', {
+      type: 'checkbox',
+      id: checkboxId,
+      name: notebook.name,
+    }).change(this._changeWrapper(this._onNotebookCheckboxChange));
+
+    div.append(checkbox);
+
+    const annotationCount = 'order' in notebook ? notebook.order.id.length : 0;
+    this._notebookAnnotationCount[notebook.id] = annotationCount;
+    if (annotationCount !== notebook.annotationCount) {
+      console.debug(
+        `Number of annotations ${annotationCount} does not match ` +
+        `annotationCount ${notebook.annotationCount} ` +
+        `for notebook ${notebook.id}`
+      );
+    }
+
+    lastUsed = new Date(notebook.lastUsed).toDateString();
+    label = $('<label>', {
+      for: checkboxId,
+      text: `${notebook.name} (${annotationCount})`,
+      title: `Last updated: ${lastUsed}`,
+    });
+
+    div.append(label);
+
+    return div;
   }
 }
 
-selectAll.change(onCheckboxChange);
+const notebookManager = new NotebookManager();
 
-// Function to help build dynamic UI elements
+notebookManager.selectAll.change(
+  notebookManager._changeWrapper(notebookManager._onSelectAllChange)
+);
+notebookManager.unassignedAnnotations.change(
+  notebookManager._changeWrapper(notebookManager._onUnassignedCheckboxChange)
+);
 
-function addCheckbox(notebook) {
-  // console.debug(notebook);
-  if (notebook.id === '') {
-    return null;
+function updateDownloadButton() {
+  if (notebookManager.nonemptySelection ||
+      $('#unassignedAnnotations:checked').length !== 0) {
+    downloadButton.attr('disabled', 'disabled');
+  } else {
+    downloadButton.removeAttr('disabled');
   }
-
-  div = $('<div>').insertBefore(downloadButton).addClass('selectionLine');
-
-  checkboxId = 'notebook_' + notebook.id;
-  checkbox = $('<input>', {
-    type: 'checkbox',
-    id: checkboxId,
-    name: notebook.name,
-  }).change(onCheckboxChange);
-
-  div.append(checkbox);
-
-  const annotationCount = 'order' in notebook ? notebook.order.id.length : 0;
-  if (annotationCount !== notebook.annotationCount) {
-    console.debug(
-      `Number of annotations ${annotationCount} does not match ` +
-      `annotationCount ${notebook.annotationCount} ` +
-      `for notebook ${notebook.id}`
-    );
-  }
-
-  lastUsed = new Date(notebook.lastUsed).toDateString();
-  label = $('<label>', {
-    for: checkboxId,
-    text: `${notebook.name} (${annotationCount})`,
-    title: `Last updated: ${lastUsed}`,
-  });
-
-  div.append(label);
-
-  return div;
 }
+
 
 // Function for performing download
 
+// TODO: replace notesUpperBound from manager
 let notesUpperBound = 0;
 
-async function fetchNotebook(notebookJson) {
+async function fetchNotebook(notebookId) {
   urlBase = `https://www.${DOMAIN}/notes/api/v2/annotations?`;
   let numberRemaining = null;
   if (notebookJson !== null) {
-    numberRemaining = notebookJson.annotationCount;
+    numberRemaining = notebookManager._notebookAnnotationCount[notebookId];
   } else {
     numberRemaining = notesUpperBound;
   }
