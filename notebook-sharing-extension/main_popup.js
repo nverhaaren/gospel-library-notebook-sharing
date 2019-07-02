@@ -126,12 +126,12 @@ class NotebookManager {
 
     this._notebooks[notebook.id] = notebook;
 
-    div = $('<div>')
+    const div = $('<div>')
       .insertBefore(this.downloadButton)
       .addClass('selectionLine');
 
-    checkboxId = 'notebook_' + notebook.id;
-    checkbox = $('<input>', {
+    const checkboxId = 'notebook_' + notebook.id;
+    const checkbox = $('<input>', {
       type: 'checkbox',
       id: checkboxId,
       name: notebook.name,
@@ -150,8 +150,8 @@ class NotebookManager {
       );
     }
 
-    lastUsed = new Date(notebook.lastUsed).toDateString();
-    label = $('<label>', {
+    const lastUsed = new Date(notebook.lastUsed).toDateString();
+    const label = $('<label>', {
       for: checkboxId,
       text: `${notebook.name} (${annotationCount})`,
       title: `Last updated: ${lastUsed}`,
@@ -182,15 +182,15 @@ function updateDownloadButton() {
 // I don't think this one needs to be async (it already returns a promise) but
 // it shouldn't hurt either
 async function fetchAnnotations(notebookId, start, numberToReturn) {
-  urlBase = `https://www.${DOMAIN}/notes/api/v2/annotations?`;
-  url = urlBase;
+  const urlBase = `https://www.${DOMAIN}/notes/api/v2/annotations?`;
+  let url = urlBase;
   if (notebookId !== null) {
     url += `folderId=${notebookId}&`;
   }
   url += `numberToReturn=${numberToReturn}&`;
   url += `start=${numberReturned + 1}&`;
   url += 'type=highlight%2Cjournal%2Creference';
-  result = fetch(url, {credentials: 'same-origin'}).then(response => response.json());
+  const result = fetch(url, {credentials: 'same-origin'}).then(response => response.json());
   console.debug('fetchAnnotations result:');
   console.debug(result);
   return result;
@@ -203,16 +203,16 @@ async function fetchNotebook(notebookId) {
   } else {
     numberRemaining = notebookManager.totalAnnotationEstimate;
   }
-  numberReturned = 0;
-  annotations = [];
+  let numberReturned = 0;
+  let annotations = [];
   while (true) {
-    numberToReturn = numberRemaining >= 0 ? numberRemaining : 50;
-    result = await fetchAnnotations(notebookId, numberReturned + 1, numberToReturn);
+    let numberToReturn = numberRemaining >= 0 ? numberRemaining : 50;
+    let result = await fetchAnnotations(notebookId, numberReturned + 1, numberToReturn);
     annotations = annotations.concat(result);
     numberRemaining -= result.length;
     numberReturned += result.length;
     if (result.length === 0 || numberRemaining <= 0) {
-      trialResult = await fetchAnnotations(notebookId, numberReturned + 1, 1);
+      let trialResult = await fetchAnnotations(notebookId, numberReturned + 1, 1);
       if (trialResult.length === 0) {
         break;
       }
@@ -261,7 +261,7 @@ ready
 })
 .then(_ => notebookManager.downloadButton.before($('<hr>')))
 .then(_ => {
-  unassignedNotebook = notebookManager.unassignedNotebook;
+  const unassignedNotebook = notebookManager.unassignedNotebook;
   if (unassignedNotebook === null || unassignedNotebook.length === 0) {
     noUnassigned = $('<p>', {text: 'You have no unassigned annotations'})
     .addClass('note');
@@ -269,9 +269,9 @@ ready
     return null;
   }
 
-  div = $('<div>').insertBefore(notebookManager.downloadButton).addClass('selectionLine');
+  const div = $('<div>').insertBefore(notebookManager.downloadButton).addClass('selectionLine');
 
-  unassignedCheckbox = $('<input>', {
+  const unassignedCheckbox = $('<input>', {
     type: 'checkbox',
     id: 'unassignedAnnotations',
     name: 'unassignedAnnotations',
@@ -281,7 +281,7 @@ ready
 
   const unassignedEstimate = unassignedNotebook !== null ? unassignedNotebook.length : 0;
 
-  label = $('<label>', {
+  const label = $('<label>', {
     for: 'unassignedAnnotations',
     text: `Include all annotations (about ${unassignedEstimate} not assigned to any notebook)`,
   });
@@ -291,10 +291,10 @@ ready
 .then(_ => notebookManager.downloadButton.before($('<hr>')))
 .then(_ => notebookManager.annotationSelection.removeAttr('hidden'))
 .catch(error => {
-  // console.log(error);
-  // console.log('About to redirect to login');
-  bgPage.updatePopup(false);
-  window.location.replace(chrome.runtime.getURL('login_popup.html'));
+  console.log(error);
+  console.log('About to redirect to login');
+  // bgPage.updatePopup(false);
+  // window.location.replace(chrome.runtime.getURL('login_popup.html'));
 });
 
 console.log('Created form');
@@ -312,6 +312,7 @@ notebookManager.downloadButton.click(event => {
   console.debug(notebookManager.selectedNotebookIds);
 
   let notebooksAnnotations = null;
+  let fetchSelectedAnnotations = null;
   // Look up annotations
   if ($('#unassignedAnnotations:checked').length > 0) {
     fetchSelectedAnnotations = fetchNotebook(null).then(allAnnotations => {
@@ -359,7 +360,7 @@ notebookManager.downloadButton.click(event => {
     return finalResult;
   }).then(finalResult => {
     const resultBlob = new Blob([JSON.stringify(finalResult, null, 4)], {type: 'application/json'});
-    blobURL = window.URL.createObjectURL(resultBlob);
+    const blobURL = window.URL.createObjectURL(resultBlob);
     chrome.downloads.download({url: blobURL, filename: 'notebooks.json', saveAs: true});
     console.log('Download complete');
   })
