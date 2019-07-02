@@ -46,7 +46,7 @@ class NotebookManager {
   // jQuery selection of elements
   get notebookCheckboxes() {
     const checkboxes = this.annotationSelection.find('div>input:checkbox');
-    console.debug(checkboxes);
+    //console.debug(checkboxes);
     const notebooks = checkboxes
       .filter((_, element) =>
               element.id.slice(0, 'notebook_'.length) === 'notebook_');
@@ -61,7 +61,7 @@ class NotebookManager {
 
   // Array of strings
   get selectedNotebookIds() {
-    notebookIds = this.notebookCheckboxes
+    const notebookIds = this.notebookCheckboxes
       .filter(':checked')
       .map((_, element) => element.id.replace('notebook_', ''));
     return notebookIds.toArray();
@@ -70,7 +70,7 @@ class NotebookManager {
   get selectedNotebooks() {
     let ret = {};
     const notebooks = this.notebooks;
-    this.selectedNotebookIds.forEach(notebookid => {
+    this.selectedNotebookIds.forEach(notebookId => {
       ret[notebookId] = notebooks[notebookId];
     });
     return ret;
@@ -93,19 +93,22 @@ class NotebookManager {
   }
 
   _onNotebookCheckboxChange(event) {
-    console.debug('selectedVector:');
-    console.debug(selectedVector);
+    console.log('selectedVector:');
+    console.log(this.selectedVector);
     if (this.selectedVector.every(x => x)) {
-      selectAll.attr('checked', 'checked');
+      this.selectAll.attr('checked', 'checked');
       return;
     }
     if (this.selectedVector.every(x => !x)) {
-      selectAll.removeAttr('checked');
+      this.selectAll.removeAttr('checked');
     }
   }
 
   _onSelectAllChange(event) {
-    target = event.target;
+    console.debug('In _onSelectAllChange:');
+    const target = event.target;
+    console.debug(this);
+    console.debug(this.notebookCheckboxes);
     if (target.checked) {
       this.notebookCheckboxes.attr('checked', 'checked');
     } else {
@@ -114,7 +117,7 @@ class NotebookManager {
   }
 
   addCheckbox(notebook) {
-    // console.debug(notebook);
+    //console.debug('In addCheckbox'); console.debug(notebook);
     if (notebook.id === '') {
       if (this.unassignedNotebook !== null) {
         throw Error('found multiple unassigned notebooks');
@@ -135,7 +138,7 @@ class NotebookManager {
       type: 'checkbox',
       id: checkboxId,
       name: notebook.name,
-    }).change(this._changeWrapper(this._onNotebookCheckboxChange));
+    }).change(this._changeWrapper(event => this._onNotebookCheckboxChange(event)));
 
     div.append(checkbox);
 
@@ -166,15 +169,15 @@ class NotebookManager {
 const notebookManager = new NotebookManager();
 
 notebookManager.selectAll.change(
-  notebookManager._changeWrapper(notebookManager._onSelectAllChange)
+  notebookManager._changeWrapper(event => notebookManager._onSelectAllChange(event))
 );
 
 function updateDownloadButton() {
   if (notebookManager.nonemptySelection ||
       $('#unassignedAnnotations:checked').length !== 0) {
-    downloadButton.attr('disabled', 'disabled');
+    notebookManager.downloadButton.removeAttr('disabled');
   } else {
-    downloadButton.removeAttr('disabled');
+    notebookManager.downloadButton.attr('disabled', 'disabled');
   }
 }
 
@@ -188,7 +191,7 @@ async function fetchAnnotations(notebookId, start, numberToReturn) {
     url += `folderId=${notebookId}&`;
   }
   url += `numberToReturn=${numberToReturn}&`;
-  url += `start=${numberReturned + 1}&`;
+  url += `start=${start}&`;
   url += 'type=highlight%2Cjournal%2Creference';
   const result = fetch(url, {credentials: 'same-origin'}).then(response => response.json());
   console.debug('fetchAnnotations result:');
@@ -206,7 +209,7 @@ async function fetchNotebook(notebookId) {
   let numberReturned = 0;
   let annotations = [];
   while (true) {
-    let numberToReturn = numberRemaining >= 0 ? numberRemaining : 50;
+    let numberToReturn = numberRemaining > 0 ? numberRemaining : 50;
     let result = await fetchAnnotations(notebookId, numberReturned + 1, numberToReturn);
     annotations = annotations.concat(result);
     numberRemaining -= result.length;
@@ -279,7 +282,8 @@ ready
 
   div.append(unassignedCheckbox);
 
-  const unassignedEstimate = unassignedNotebook !== null ? unassignedNotebook.length : 0;
+  const unassignedEstimate = unassignedNotebook !== null ?
+                             unassignedNotebook.annotationCount : 0;
 
   const label = $('<label>', {
     for: 'unassignedAnnotations',
