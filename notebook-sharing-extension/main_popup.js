@@ -168,6 +168,8 @@ class NotebookManager {
 
 const notebookManager = new NotebookManager();
 
+// This kind of lambda used to just call a method is necessary due to how
+// JavaScript does classes (as syntactic sugar)
 notebookManager.selectAll.change(
   notebookManager._changeWrapper(event => notebookManager._onSelectAllChange(event))
 );
