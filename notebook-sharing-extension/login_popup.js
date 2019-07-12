@@ -1,4 +1,3 @@
-const DOMAIN = 'churchofjesuschrist.org';
 const openLogin = document.getElementById('openLogin');
 console.log('In login_popup.js');
 
